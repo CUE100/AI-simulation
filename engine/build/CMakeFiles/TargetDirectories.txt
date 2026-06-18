@@ -1,0 +1,3 @@
+/Users/dakshbeniwal/codemolde/AI-simulation/engine/build/CMakeFiles/AI_simulation.dir
+/Users/dakshbeniwal/codemolde/AI-simulation/engine/build/CMakeFiles/edit_cache.dir
+/Users/dakshbeniwal/codemolde/AI-simulation/engine/build/CMakeFiles/rebuild_cache.dir
