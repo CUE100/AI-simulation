@@ -1,1 +1,0 @@
-/usr/bin/c++ -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/AI_simulation.dir/main.cpp.o -o AI_simulation  -Wl,-rpath,/opt/homebrew/opt/sfml/lib /opt/homebrew/opt/sfml/lib/libsfml-graphics.3.0.1.dylib /opt/homebrew/opt/sfml/lib/libsfml-audio.3.0.1.dylib /opt/homebrew/opt/sfml/lib/libsfml-window.3.0.1.dylib /opt/homebrew/opt/sfml/lib/libsfml-system.3.0.1.dylib
