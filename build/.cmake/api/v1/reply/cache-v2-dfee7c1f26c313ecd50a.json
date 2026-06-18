@@ -11,7 +11,7 @@
 				}
 			],
 			"type" : "STATIC",
-			"value" : "/Users/dakshbeniwal/codemolde/AI-simulation/build"
+			"value" : "/Users/rohinboora/code/AI-simulation/build"
 		},
 		{
 			"name" : "AI_simulation_IS_TOP_LEVEL",
@@ -35,7 +35,7 @@
 				}
 			],
 			"type" : "STATIC",
-			"value" : "/Users/dakshbeniwal/codemolde/AI-simulation"
+			"value" : "/Users/rohinboora/code/AI-simulation"
 		},
 		{
 			"name" : "CMAKE_ADDR2LINE",
@@ -91,7 +91,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "/Users/dakshbeniwal/codemolde/AI-simulation/build"
+			"value" : "/Users/rohinboora/code/AI-simulation/build"
 		},
 		{
 			"name" : "CMAKE_CACHE_MAJOR_VERSION",
@@ -115,7 +115,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "1"
+			"value" : "3"
 		},
 		{
 			"name" : "CMAKE_CACHE_PATCH_VERSION",
@@ -127,7 +127,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "2"
+			"value" : "3"
 		},
 		{
 			"name" : "CMAKE_COMMAND",
@@ -443,7 +443,7 @@
 				}
 			],
 			"type" : "STATIC",
-			"value" : "/Users/dakshbeniwal/codemolde/AI-simulation/build/CMakeFiles/pkgRedirects"
+			"value" : "/Users/rohinboora/code/AI-simulation/build/CMakeFiles/pkgRedirects"
 		},
 		{
 			"name" : "CMAKE_GENERATOR",
@@ -503,7 +503,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "/Users/dakshbeniwal/codemolde/AI-simulation"
+			"value" : "/Users/rohinboora/code/AI-simulation"
 		},
 		{
 			"name" : "CMAKE_INSTALL_NAME_TOOL",
@@ -575,7 +575,7 @@
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "/opt/homebrew/bin/ninja"
+			"value" : "/Library/Frameworks/Python.framework/Versions/3.14/bin/ninja"
 		},
 		{
 			"name" : "CMAKE_MODULE_LINKER_FLAGS",
@@ -812,6 +812,18 @@
 			],
 			"type" : "STATIC",
 			"value" : "AI_simulation"
+		},
+		{
+			"name" : "CMAKE_PROJECT_SPDX_LICENSE",
+			"properties" : 
+			[
+				{
+					"name" : "HELPSTRING",
+					"value" : "Value Computed by CMake"
+				}
+			],
+			"type" : "STATIC",
+			"value" : ""
 		},
 		{
 			"name" : "CMAKE_PROJECT_VERSION",
@@ -1139,7 +1151,7 @@
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/tapi"
+			"value" : "/Library/Developer/CommandLineTools/usr/bin/tapi"
 		},
 		{
 			"name" : "CMAKE_UNAME",

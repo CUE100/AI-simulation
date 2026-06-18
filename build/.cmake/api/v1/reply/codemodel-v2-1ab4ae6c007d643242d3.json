@@ -2,11 +2,12 @@
 	"configurations" : 
 	[
 		{
+			"abstractTargets" : [],
 			"directories" : 
 			[
 				{
 					"build" : ".",
-					"jsonFile" : "directory-.-Debug-f5ebdc15457944623624.json",
+					"jsonFile" : "directory-.-Debug-fd6451d79dc282e2f566.json",
 					"minimumCMakeVersion" : 
 					{
 						"string" : "3.16"
@@ -39,7 +40,7 @@
 				{
 					"directoryIndex" : 0,
 					"id" : "ai_simulation::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-ai_simulation-Debug-c7533568f363506b97bb.json",
+					"jsonFile" : "target-ai_simulation-Debug-a9dc4344643f7a79e249.json",
 					"name" : "ai_simulation",
 					"projectIndex" : 0
 				}
@@ -49,12 +50,12 @@
 	"kind" : "codemodel",
 	"paths" : 
 	{
-		"build" : "/Users/dakshbeniwal/codemolde/AI-simulation/build",
-		"source" : "/Users/dakshbeniwal/codemolde/AI-simulation"
+		"build" : "/Users/rohinboora/code/AI-simulation/build",
+		"source" : "/Users/rohinboora/code/AI-simulation"
 	},
 	"version" : 
 	{
 		"major" : 2,
-		"minor" : 8
+		"minor" : 10
 	}
 }
