@@ -1,0 +1,8 @@
+[
+{
+  "directory": "/Users/dakshbeniwal/codemolde/AI-simulation/build",
+  "command": "/usr/bin/clang++ -I/Users/dakshbeniwal/codemolde/AI-simulation/engine -g -std=c++17 -arch arm64 -Wall -Wextra -Wpedantic -o CMakeFiles/ai_simulation.dir/engine/main.cpp.o -c /Users/dakshbeniwal/codemolde/AI-simulation/engine/main.cpp",
+  "file": "/Users/dakshbeniwal/codemolde/AI-simulation/engine/main.cpp",
+  "output": "/Users/dakshbeniwal/codemolde/AI-simulation/build/CMakeFiles/ai_simulation.dir/engine/main.cpp.o"
+}
+]
