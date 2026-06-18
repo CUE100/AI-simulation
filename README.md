@@ -1,2 +1,2 @@
 # AI-simulation
-BY @CUE100 and @codemolde
+BY @CUE100 and @codemolde ...
