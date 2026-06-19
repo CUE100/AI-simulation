@@ -15,7 +15,7 @@ class AIbrain(nn.Module):
         self.visual_input = None
         self.sound_input = None
         self.sense_input = None
-        self.chemical = None
+        self.chemical_input = None
 
     def visual(self, map_data):
         matrix_array = np.array(map_data, dtype=np.float32)
