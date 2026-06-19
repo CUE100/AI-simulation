@@ -12,14 +12,33 @@ device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 class AIbrain(nn.Module):
     def __init__(self):
         super().__init__()
-        self.visual = None
-        self.sound = None
-        self.sense = None
+        self.visual_input = None
+        self.sound_input = None
+        self.sense_input = None
         self.chemical = None
 
     def visual(self, map_data):
-        matrix_array = np.array(raw_map_grid, dtype=np.float32)
+        matrix_array = np.array(map_data, dtype=np.float32)
         visual_tensor = torch.tensor(matrix_array, dtype=torch.float32)
         visual_tensor = visual_tensor.permute(2, 0, 1)
         final_visual_matrix = visual_tensor.unsqueeze(0)
         return final_visual_matrix
+
+    def sound(self, audio_frequencies):
+        raw_list = list(audio_frequencies)
+        numpy_vector = np.array(raw_list, dtype=np.float32)
+        sound_tensor = torch.tensor(numpy_vector, dtype=torch.float32)
+        final_sound_vector = sound_tensor.unsqueeze(0)
+        return final_sound_vector
+
+    def sense(self, tactile_data):
+        numpy_vector = np.array(tactile_data, dtype=np.float32)
+        sense_tensor = torch.tensor(numpy_vector, dtype=torch.float32)
+        final_sense_vector = sense_tensor.unsqueeze(0)
+        return final_sense_vector
+
+    def chemical(self, chemical_data):
+        numpy_vector = np.array(chemical_data, dtype=np.float32)
+        chemical_tensor = torch.tensor(numpy_vector, dtype=np.float32)
+        final_chemical_vector = chemical_tensor.unsqueeze(0)
+        return final_chemical_vector
