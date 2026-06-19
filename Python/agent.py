@@ -12,3 +12,9 @@ device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 class AIbrain(nn.Module):
     def __init__(self):
         super().__init__()
+        self.visual = visual
+        self.sound = sound
+        self.sense = sense
+        self.chemical = chemical
+
+    def visual():
