@@ -17,6 +17,7 @@ find_package(SFML 3 COMPONENTS Graphics Window System Audio REQUIRED)
 
 add_executable(${PROJECT_NAME}
     main.cpp
+    FastNoiseLite.h
 )
 
 set(ASSETS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Assests")

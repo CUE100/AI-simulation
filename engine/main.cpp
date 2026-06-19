@@ -1,5 +1,6 @@
 #include <iostream>
 #include <SFML/Graphics.hpp>
+#include "FastNoiseLite.h"
 #include <optional>
 
 int main()
