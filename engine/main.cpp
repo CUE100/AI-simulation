@@ -2,6 +2,7 @@
 #include <SFML/Graphics.hpp>
 #include "FastNoiseLite.h"
 #include <optional>
+#include <unordered_map>
 
 struct Player {
     sf::CircleShape shape;
@@ -29,7 +30,6 @@ struct Tile {
 };
 
 
-
 int main()
 {
     sf::RenderWindow window(sf::VideoMode({800, 600}), "AI Simulation");
@@ -46,8 +46,9 @@ int main()
     FastNoiseLite noise;
     noise.SetSeed(42);
 
-    int worldWidth = 1000;
-    int worldHeight = 1000;
+   
+    int worldWidth = 10000;
+    int worldHeight = 10000;
     std::vector<std::vector<Tile>> world(worldHeight, std::vector<Tile>(worldWidth));
 
     for (int y = 0; y < worldHeight; ++y) {
