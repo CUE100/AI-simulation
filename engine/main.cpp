@@ -78,11 +78,22 @@ int main()
             cam.setCenter(player.shape.getPosition());
             window.setView(cam);
 
+            float left = cam.getCenter().x - cam.getSize().x / 2.f;
+            float right = cam.getCenter().x + cam.getSize().x / 2.f;
+            float top = cam.getCenter().y - cam.getSize().y / 2.f;
+            float bottom = cam.getCenter().y + cam.getSize().y / 2.f;
+
+            int startX = std::max(0, static_cast<int>(left / 8.f));
+            int endX = std::min(worldWidth, static_cast<int>(right / 8.f) + 1);
+
+            int startY = std::max(0, static_cast<int>(top / 8.f));
+            int endY = std::min(worldHeight, static_cast<int>(bottom / 8.f) + 1);
+
             window.clear(sf::Color::Black);
             
-            for (int y = 0; y < worldHeight; y++)
+            for (int y = startY; y < endY; y++)
             {
-                for (int x = 0; x < worldWidth; x++)
+                for (int x = startX; x < endX; x++)
                 {
                     tileShape.setPosition({static_cast<float>(x) * 8, static_cast<float>(y) * 8});
                     float height = world[y][x].height;
