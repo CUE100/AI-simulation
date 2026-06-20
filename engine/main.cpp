@@ -260,7 +260,24 @@ int main()
                                         float((chunkX * Chunk_Size + x) * Tile_Size),
                                         float((chunkY * Chunk_Size + y) * Tile_Size)};
 
-                                    chunk.trees.push_back(tree);
+                                    bool canPlace = true;
+
+                                    for (const Tree &other : chunk.trees)
+                                    {
+                                        float dx = tree.position.x - other.position.x;
+                                        float dy = tree.position.y - other.position.y;
+
+                                        if (dx * dx + dy * dy < 16.f * 16.f)
+                                        {
+                                            canPlace = false;
+                                            break;
+                                        }
+                                    }
+
+                                    if (canPlace)
+                                    {
+                                        chunk.trees.push_back(tree);
+                                    }
                                 }
                             }
                         }
@@ -301,6 +318,7 @@ int main()
                         window.draw(tileShape);
                     }
                 }
+                bool canPlace = true;
                 for (const Tree &tree : chunk.trees)
                 {
                     SpawnTree(window, tree.position);
