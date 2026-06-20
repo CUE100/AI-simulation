@@ -35,9 +35,17 @@ struct Tile {
     BiomeType biome;
 };
 
+struct Tree
+{
+    sf::Vector2f position;
+};
+
 struct Chunk
 {
     Tile tiles[Chunk_Size][Chunk_Size];
+
+    std::vector<Tree> trees;
+    bool treesGenerated = false;
 };
 
 struct ChunkCoord
@@ -63,6 +71,8 @@ int floorTile(float worldPosition)
 {
     return static_cast<int>(std::floor(worldPosition / static_cast<float>(Tile_Size)));
 }
+
+
 
 Chunk generateChunk(int chunkX, int chunkY, FastNoiseLite& noise)
 {
@@ -126,7 +136,7 @@ void SpawnTree(sf::RenderWindow& window,sf::Vector2f position)
 {
     sf::Color treeColor(54, 139, 70);
     sf::Vector2f center(position);
-    float radius = 100.f;
+    float radius = 10.f;
 
     sf::VertexArray tree(sf::PrimitiveType::TriangleFan , 8);
 
@@ -170,6 +180,7 @@ int main()
 
     FastNoiseLite noise;
     noise.SetSeed(42);
+    
 
     std::map<std::pair<int, int>, Chunk> chunks;
 
@@ -228,7 +239,35 @@ int main()
         {
             for (int chunkX = startChunkX; chunkX <= endChunkX; ++chunkX)
             {
-                Chunk& chunk = getChunk(chunks, chunkX, chunkY, noise);
+                Chunk &chunk = getChunk(chunks, chunkX, chunkY, noise);
+
+                // Generate trees ONCE.
+                if (!chunk.treesGenerated)
+                {
+                    for (int y = 0; y < Chunk_Size; ++y)
+                    {
+                        for (int x = 0; x < Chunk_Size; ++x)
+                        {
+                            float height = chunk.tiles[y][x].height;
+
+                            if (height > 0.4f && height < 0.7f)
+                            {
+                                if (rand() % 100 < 1)
+                                {
+                                    Tree tree;
+
+                                    tree.position = {
+                                        float((chunkX * Chunk_Size + x) * Tile_Size),
+                                        float((chunkY * Chunk_Size + y) * Tile_Size)};
+
+                                    chunk.trees.push_back(tree);
+                                }
+                            }
+                        }
+                    }
+
+                    chunk.treesGenerated = true;
+                }
 
                 for (int localY = 0; localY < Chunk_Size; ++localY)
                 {
@@ -237,72 +276,38 @@ int main()
                         int tileX = chunkX * Chunk_Size + localX;
                         int tileY = chunkY * Chunk_Size + localY;
 
-                        if (tileX < startTileX || tileX >= endTileX || tileY < startTileY || tileY >= endTileY)
+                        if (tileX < startTileX ||
+                            tileX >= endTileX ||
+                            tileY < startTileY ||
+                            tileY >= endTileY)
                         {
                             continue;
                         }
 
-                        tileShape.setPosition({
-                            static_cast<float>(tileX * Tile_Size),
-                            static_cast<float>(tileY * Tile_Size)
-                        });
+                        tileShape.setPosition({float(tileX * Tile_Size),
+                                               float(tileY * Tile_Size)});
 
                         float height = chunk.tiles[localY][localX].height;
 
                         if (height < 0.3f)
-                        {
                             tileShape.setFillColor(sf::Color::Blue);
-                        }
                         else if (height < 0.4f)
-                        {
                             tileShape.setFillColor(sf::Color::Yellow);
-                        }
                         else if (height < 0.7f)
-                        {
                             tileShape.setFillColor(sf::Color::Green);
-                        }
                         else
-                        {
                             tileShape.setFillColor(sf::Color(120, 120, 120));
-                        }
 
                         window.draw(tileShape);
                     }
                 }
-            }
-        }
-        for (int chunkY = startChunkY; chunkY <= endChunkY; ++chunkY)
-        {
-            for (int chunkX = startChunkX; chunkX <= endChunkX; ++chunkX)
-            {
-                Chunk &chunk = getChunk(chunks, chunkX, chunkY, noise);
-
-                for (int localY = 0; localY < Chunk_Size; ++localY)
+                for (const Tree &tree : chunk.trees)
                 {
-                    for (int localX = 0; localX < Chunk_Size; ++localX)
-                    {
-                        int tileX = chunkX * Chunk_Size + localX;
-                        int tileY = chunkY * Chunk_Size + localY;
-
-                        if (tileX < startTileX || tileX >= endTileX || tileY < startTileY || tileY >= endTileY)
-                        {
-                            continue;
-                        }
-                        
-
-                        float height = chunk.tiles[localY][localX].height;
-                        if (height < 0.7f && height > 0.4f)
-                        {
-                            if(rand() % 100 < 0.001) {
-                                SpawnTree(window, sf::Vector2f(static_cast<float>(tileX * Tile_Size), static_cast<float>(tileY * Tile_Size)));
-                            }
-                        }
-                      
-
-                    }
+                    SpawnTree(window, tree.position);
                 }
             }
         }
+
         window.draw(player.shape);
         window.display();
     }
