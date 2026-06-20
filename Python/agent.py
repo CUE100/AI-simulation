@@ -62,14 +62,11 @@ class AIbrain(nn.Module):
 
         x_vis = F.relu(self.visual_layer(v_tensor))
         x_vis = torch.flatten(x_vis, start_dim=1)
-
         x_snd = F.relu(self.sound_layer(s_tensor))
         x_sns = F.relu(self.sense_layer(t_tensor))
         x_chm = F.relu(self.chemical_layer(c_tensor))
         x_hmo = F.relu(self.homeostasis_layer(h_tensor))
 
         fused_thoughts = torch.cat((x_vis, x_snd, x_sns, x_chm, x_hmo), dim=1)
-
         raw_scores = self.decision_core(fused_thoughts)
-
         return F.softmax(raw_scores, dim=-1)
