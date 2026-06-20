@@ -122,6 +122,34 @@ void unloadFarChunks(std::map<std::pair<int, int>, Chunk>& chunks, int centerChu
     }
 }
 
+void SpawnTree(sf::RenderWindow& window,sf::Vector2f position)
+{
+    sf::Color treeColor(54, 139, 70);
+    sf::Vector2f center(position);
+    float radius = 100.f;
+
+    sf::VertexArray tree(sf::PrimitiveType::TriangleFan , 8);
+
+    tree[0].position = center;
+    tree[0].color = treeColor;
+
+    for (size_t i = 0; i < 7; ++i)
+    {
+        // Convert index to radians (60 degrees per step)
+        float angle = i * 2 * M_PI / 6;
+
+        // Calculate X and Y coordinates relative to the center
+        float x = center.x + radius * std::cos(angle);
+        float y = center.y + radius * std::sin(angle);
+
+        tree[i + 1].position = sf::Vector2f(x, y);
+        tree[i + 1].color = treeColor;
+    }
+
+
+    window.draw(tree);
+}
+
 int main()
 {
     sf::RenderWindow window(sf::VideoMode({800, 600}), "AI Simulation");
@@ -239,6 +267,38 @@ int main()
                         }
 
                         window.draw(tileShape);
+                    }
+                }
+            }
+        }
+        for (int chunkY = startChunkY; chunkY <= endChunkY; ++chunkY)
+        {
+            for (int chunkX = startChunkX; chunkX <= endChunkX; ++chunkX)
+            {
+                Chunk &chunk = getChunk(chunks, chunkX, chunkY, noise);
+
+                for (int localY = 0; localY < Chunk_Size; ++localY)
+                {
+                    for (int localX = 0; localX < Chunk_Size; ++localX)
+                    {
+                        int tileX = chunkX * Chunk_Size + localX;
+                        int tileY = chunkY * Chunk_Size + localY;
+
+                        if (tileX < startTileX || tileX >= endTileX || tileY < startTileY || tileY >= endTileY)
+                        {
+                            continue;
+                        }
+                        
+
+                        float height = chunk.tiles[localY][localX].height;
+                        if (height < 0.7f && height > 0.4f)
+                        {
+                            if(rand() % 100 < 0.001) {
+                                SpawnTree(window, sf::Vector2f(static_cast<float>(tileX * Tile_Size), static_cast<float>(tileY * Tile_Size)));
+                            }
+                        }
+                      
+
                     }
                 }
             }
