@@ -333,7 +333,7 @@ int main()
                                              (chunkY * Chunk_Size + y) * 0.3f) +
                                          1.f) *
                                         0.5f;
-                                    if ((forestDensity > 0.4f) && (localVariation > 0.5f))
+                                    if ((forestDensity > 0.3f) && (localVariation > 0.5f))
                                     {
                                         Tree tree;
 
