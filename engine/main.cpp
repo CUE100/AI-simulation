@@ -76,7 +76,7 @@ int floorTile(float worldPosition)
 
 
 
-Chunk generateChunk(int chunkX, int chunkY, FastNoiseLite& noise, FastNoiseLite& moistureNoise, FastNoiseLite& temperatureNoise)
+Chunk generateChunk(int chunkX, int chunkY, FastNoiseLite& noise, FastNoiseLite& moistureNoise, FastNoiseLite& temperatureNoise, FastNoiseLite& continentNoise, FastNoiseLite& treeGenerator)
 {
     Chunk chunk;
 
@@ -88,9 +88,17 @@ Chunk generateChunk(int chunkX, int chunkY, FastNoiseLite& noise, FastNoiseLite&
             int worldTileY = chunkY * Chunk_Size + localY;
 
             Tile tile;
+
+            
+            float continent =
+                (continentNoise.GetNoise(
+                     worldTileX * 0.005f,
+                     worldTileY * 0.005f) +
+                 1.f) *
+                0.5f;
             tile.height = (noise.GetNoise(
                 static_cast<float>(worldTileX) * 0.05f,
-                static_cast<float>(worldTileY) * 0.05f) *0.7f + temperatureNoise.GetNoise(static_cast<float>(worldTileX) * 0.05f, static_cast<float>(worldTileY) * 0.05f) * 0.2f + moistureNoise.GetNoise(static_cast<float>(worldTileX) * 0.05f, static_cast<float>(worldTileY) * 0.05f) * 0.1f + 1.f) * 0.5f;
+                static_cast<float>(worldTileY) * 0.05f) *0.7f + continent * 0.3f + 1.f) * 0.5f;
             tile.moisture =
                 (moistureNoise.GetNoise(
                      worldTileX * 0.03f,
@@ -127,14 +135,14 @@ Chunk generateChunk(int chunkX, int chunkY, FastNoiseLite& noise, FastNoiseLite&
     return chunk;
 }
 
-Chunk& getChunk(std::map<std::pair<int, int>, Chunk>& chunks, int chunkX, int chunkY, FastNoiseLite& noise, FastNoiseLite& moistureNoise, FastNoiseLite& temperatureNoise)
+Chunk& getChunk(std::map<std::pair<int, int>, Chunk>& chunks, int chunkX, int chunkY, FastNoiseLite& noise, FastNoiseLite& moistureNoise, FastNoiseLite& temperatureNoise, FastNoiseLite& continentNoise, FastNoiseLite& treeGenerator)
 {
     auto key = std::make_pair(chunkX, chunkY);
     auto it = chunks.find(key);
 
     if (it == chunks.end())
     {
-        it = chunks.emplace(key, generateChunk(chunkX, chunkY, noise, moistureNoise, temperatureNoise)).first;
+        it = chunks.emplace(key, generateChunk(chunkX, chunkY, noise, moistureNoise, temperatureNoise, continentNoise, treeGenerator)).first;
     }
 
     return it->second;
@@ -205,10 +213,14 @@ int main()
     cam.setCenter(player.shape.getPosition());
 
     FastNoiseLite noise;
-    noise.SetSeed(42);
     FastNoiseLite moistureNoise;
     FastNoiseLite temperatureNoise;
-
+    FastNoiseLite continentNoise;
+    FastNoiseLite treeGenerator;
+    
+    noise.SetSeed(42);
+    treeGenerator.SetSeed(789);
+    continentNoise.SetSeed(999);
     moistureNoise.SetSeed(123);
     temperatureNoise.SetSeed(456);
 
@@ -269,7 +281,7 @@ int main()
         {
             for (int chunkX = startChunkX; chunkX <= endChunkX; ++chunkX)
             {
-                Chunk &chunk = getChunk(chunks, chunkX, chunkY, noise, moistureNoise, temperatureNoise);
+                Chunk &chunk = getChunk(chunks, chunkX, chunkY, noise, moistureNoise, temperatureNoise, continentNoise, treeGenerator);
 
                 if (!chunk.treesGenerated)
                 {
@@ -279,9 +291,13 @@ int main()
                         {
                             float height = chunk.tiles[y][x].height;
 
-                            if (height > 0.4f && height < 0.7f)
+                            if (chunk.tiles[y][x].biome ==
+
+                                BiomeType::Forest&& height > 0.4f && height < 0.7f)
                             {
-                                if (rand() % 100 < 1)
+                                if ((treeGenerator.GetNoise(
+                                        (chunkX * Chunk_Size + x) * 0.9f,
+                                        (chunkY * Chunk_Size + y) * 0.9f)+1)*0.5f > 0.75f)
                                 {
                                     Tree tree;
 
