@@ -9,6 +9,8 @@ constexpr int Chunk_Size = 32;
 constexpr int Tile_Size = 8;
 constexpr int Chunk_Unload_Radius = 8;
 constexpr float Camera_Zoom = 3.f;
+constexpr int Tree_Cell = 6;
+constexpr float TreeSpacing = 32.f;
 
 struct Player {
     sf::CircleShape shape;
@@ -226,6 +228,7 @@ int main()
 
     std::map<std::pair<int, int>, Chunk> chunks;
 
+
     while (window.isOpen())
     {
         while (std::optional event = window.pollEvent())
@@ -244,10 +247,10 @@ int main()
             }
         }
 
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W)) player.shape.move({0, -1 * 10});
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S)) player.shape.move({0, 1 * 10});
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A)) player.shape.move({-1 * 10, 0});
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D)) player.shape.move({1 * 10, 0});
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W)) player.shape.move({0, -1 * 40});
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S)) player.shape.move({0, 1 * 40});
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A)) player.shape.move({-1 * 40, 0});
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D)) player.shape.move({1 * 40, 0});
 
         auto pos = player.shape.getPosition();
 
@@ -289,39 +292,73 @@ int main()
                     {
                         for (int x = 0; x < Chunk_Size; ++x)
                         {
+                            int worldX = chunkX * Chunk_Size + x;
+                            int worldY = chunkY * Chunk_Size + y;
+
                             float height = chunk.tiles[y][x].height;
+                            int cellX = floorDiv(worldX, Tree_Cell);
+                            int cellY = floorDiv(worldY, Tree_Cell);
+
+                            int seed =
+                                cellX * 92837111 ^
+                                cellY * 689287499;
+
+                            float offsetX =
+                                ((seed & 255) / 255.f - 0.5f) * TreeSpacing;
+
+                            float offsetY =
+                                (((seed >> 8) & 255) / 255.f - 0.5f) * TreeSpacing;
 
                             if (chunk.tiles[y][x].biome ==
 
-                                BiomeType::Forest&& height > 0.4f && height < 0.7f)
+                                BiomeType::Forest && height > 0.4f && height < 0.7f)
                             {
-                                if ((treeGenerator.GetNoise(
-                                        (chunkX * Chunk_Size + x) * 0.9f,
-                                        (chunkY * Chunk_Size + y) * 0.9f)+1)*0.5f > 0.75f)
-                                {
-                                    Tree tree;
+                                if(worldX%Tree_Cell == 0 && worldY % Tree_Cell == 0){
+                                    float forestDensity =
 
-                                    tree.position = {
-                                        float((chunkX * Chunk_Size + x) * Tile_Size),
-                                        float((chunkY * Chunk_Size + y) * Tile_Size)};
+                                        (treeGenerator.GetNoise(
 
-                                    bool canPlace = true;
+                                            (chunkX * Chunk_Size + x) * 0.03f,
 
-                                    for (const Tree &other : chunk.trees)
+                                             (chunkY * Chunk_Size + y) * 0.03f) +
+                                         1.f) *
+                                        0.5f;
+
+                                    float localVariation =
+
+                                        (treeGenerator.GetNoise(
+
+                                             (chunkX * Chunk_Size + x) * 0.3f,
+
+                                             (chunkY * Chunk_Size + y) * 0.3f) +
+                                         1.f) *
+                                        0.5f;
+                                    if ((forestDensity > 0.4f) && (localVariation > 0.5f))
                                     {
-                                        float dx = tree.position.x - other.position.x;
-                                        float dy = tree.position.y - other.position.y;
+                                        Tree tree;
 
-                                        if (dx * dx + dy * dy < 16.f * 16.f)
+                                        tree.position = {
+                                            float((chunkX * Chunk_Size + x) * Tile_Size)+ offsetX,
+                                            float((chunkY * Chunk_Size + y) * Tile_Size)+ offsetY};
+
+                                        bool canPlace = true;
+
+                                        for (const Tree &other : chunk.trees)
                                         {
-                                            canPlace = false;
-                                            break;
-                                        }
-                                    }
+                                            float dx = tree.position.x - other.position.x;
+                                            float dy = tree.position.y - other.position.y;
 
-                                    if (canPlace)
-                                    {
-                                        chunk.trees.push_back(tree);
+                                            if (dx * dx + dy * dy < TreeSpacing * TreeSpacing)
+                                            {
+                                                canPlace = false;
+                                                break;
+                                            }
+                                        }
+
+                                        if (canPlace)
+                                        {
+                                            chunk.trees.push_back(tree);
+                                        }
                                     }
                                 }
                             }
