@@ -24,7 +24,9 @@ enum class BiomeType : uint8_t
     Forest = 1,
     Tundra = 2,
     Grassland = 3,
-    Swamp = 4
+    Swamp = 4,
+    WaterBody = 5,
+    Mountain = 6
 };
 
 struct Tile {
@@ -74,7 +76,7 @@ int floorTile(float worldPosition)
 
 
 
-Chunk generateChunk(int chunkX, int chunkY, FastNoiseLite& noise)
+Chunk generateChunk(int chunkX, int chunkY, FastNoiseLite& noise, FastNoiseLite& moistureNoise, FastNoiseLite& temperatureNoise)
 {
     Chunk chunk;
 
@@ -87,12 +89,36 @@ Chunk generateChunk(int chunkX, int chunkY, FastNoiseLite& noise)
 
             Tile tile;
             tile.height = (noise.GetNoise(
-                static_cast<float>(worldTileX) * 0.1f,
-                static_cast<float>(worldTileY) * 0.1f) + 1.0f) * 0.5f;
-            tile.moisture = 0.f;
-            tile.temperature = 0.f;
+                static_cast<float>(worldTileX) * 0.05f,
+                static_cast<float>(worldTileY) * 0.05f) + 1.0f) * 0.5f;
+            tile.moisture =
+                (moistureNoise.GetNoise(
+                     worldTileX * 0.03f,
+                     worldTileY * 0.03f) +
+                 1.f) *
+                0.5f;
+
+            tile.temperature =
+                (temperatureNoise.GetNoise(
+                     worldTileX * 0.01f,
+                     worldTileY * 0.01f) +
+                 1.f) *
+                0.5f;
+
             tile.fertility = 0.f;
-            tile.biome = BiomeType::Grassland;
+            if (tile.height < 0.3f)
+                tile.biome = BiomeType::WaterBody;
+            else if (tile.height > 0.7f)
+                tile.biome = BiomeType::Mountain;
+            else if (tile.temperature > 0.7f &&
+                     tile.moisture < 0.3f)
+                tile.biome = BiomeType::Desert;
+            else if (tile.temperature < 0.3f)
+                tile.biome = BiomeType::Tundra;
+            else if (tile.moisture > 0.7f)
+                tile.biome = BiomeType::Swamp;
+            else
+                tile.biome = BiomeType::Forest;
 
             chunk.tiles[localY][localX] = tile;
         }
@@ -101,14 +127,14 @@ Chunk generateChunk(int chunkX, int chunkY, FastNoiseLite& noise)
     return chunk;
 }
 
-Chunk& getChunk(std::map<std::pair<int, int>, Chunk>& chunks, int chunkX, int chunkY, FastNoiseLite& noise)
+Chunk& getChunk(std::map<std::pair<int, int>, Chunk>& chunks, int chunkX, int chunkY, FastNoiseLite& noise, FastNoiseLite& moistureNoise, FastNoiseLite& temperatureNoise)
 {
     auto key = std::make_pair(chunkX, chunkY);
     auto it = chunks.find(key);
 
     if (it == chunks.end())
     {
-        it = chunks.emplace(key, generateChunk(chunkX, chunkY, noise)).first;
+        it = chunks.emplace(key, generateChunk(chunkX, chunkY, noise, moistureNoise, temperatureNoise)).first;
     }
 
     return it->second;
@@ -180,7 +206,11 @@ int main()
 
     FastNoiseLite noise;
     noise.SetSeed(42);
-    
+    FastNoiseLite moistureNoise;
+    FastNoiseLite temperatureNoise;
+
+    moistureNoise.SetSeed(123);
+    temperatureNoise.SetSeed(456);
 
     std::map<std::pair<int, int>, Chunk> chunks;
 
@@ -239,9 +269,8 @@ int main()
         {
             for (int chunkX = startChunkX; chunkX <= endChunkX; ++chunkX)
             {
-                Chunk &chunk = getChunk(chunks, chunkX, chunkY, noise);
+                Chunk &chunk = getChunk(chunks, chunkX, chunkY, noise, moistureNoise, temperatureNoise);
 
-                // Generate trees ONCE.
                 if (!chunk.treesGenerated)
                 {
                     for (int y = 0; y < Chunk_Size; ++y)
@@ -318,6 +347,7 @@ int main()
                         window.draw(tileShape);
                     }
                 }
+
                 bool canPlace = true;
                 for (const Tree &tree : chunk.trees)
                 {
