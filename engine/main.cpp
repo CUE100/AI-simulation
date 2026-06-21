@@ -90,7 +90,7 @@ Chunk generateChunk(int chunkX, int chunkY, FastNoiseLite& noise, FastNoiseLite&
             Tile tile;
             tile.height = (noise.GetNoise(
                 static_cast<float>(worldTileX) * 0.05f,
-                static_cast<float>(worldTileY) * 0.05f) + 1.0f) * 0.5f;
+                static_cast<float>(worldTileY) * 0.05f) *0.7f + temperatureNoise.GetNoise(static_cast<float>(worldTileX) * 0.05f, static_cast<float>(worldTileY) * 0.05f) * 0.2f + moistureNoise.GetNoise(static_cast<float>(worldTileX) * 0.05f, static_cast<float>(worldTileY) * 0.05f) * 0.1f + 1.f) * 0.5f;
             tile.moisture =
                 (moistureNoise.GetNoise(
                      worldTileX * 0.03f,
