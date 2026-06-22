@@ -5,24 +5,32 @@
 #include <cmath>
 #include <cstdint>
 #include <climits>
+#include <algorithm>
 
 constexpr int Chunk_Size = 32;
 constexpr int Tile_Size = 8;
 constexpr int Chunk_Unload_Radius = 8;
 constexpr float Camera_Zoom = 3.f;
 constexpr int Tree_Cell = 6;
-constexpr float TreeSpacing = 32.f;
 
-sf::Color LerpColor(const sf::Color &a,
-                    const sf::Color &b,
-                    float t)
+const sf::Color WaterColor(30, 100, 220);
+const sf::Color BeachColor(235, 220, 150);
+const sf::Color GrassColor(110, 190, 70);
+const sf::Color ForestColor(40, 100, 50);
+const sf::Color SwampColor(60, 90, 50);
+const sf::Color DesertColor(220, 210, 120);
+const sf::Color TundraColor(190, 220, 220);
+const sf::Color MountainColor(120, 120, 120);
+const sf::Color SnowColor(255, 255, 255);
+
+sf::Color lerpColor(sf::Color a, sf::Color b, float t)
 {
     t = std::clamp(t, 0.f, 1.f);
 
     return sf::Color(
-        static_cast<uint8_t>(a.r + (b.r - a.r) * t),
-        static_cast<uint8_t>(a.g + (b.g - a.g) * t),
-        static_cast<uint8_t>(a.b + (b.b - a.b) * t));
+        a.r + (b.r - a.r) * t,
+        a.g + (b.g - a.g) * t,
+        a.b + (b.b - a.b) * t);
 }
 
 struct Player {
@@ -41,7 +49,8 @@ enum class BiomeType : uint8_t
     Grassland = 3,
     Swamp = 4,
     WaterBody = 5,
-    Mountain = 6
+    Mountain = 6,
+    Beach = 7
 };
 
 struct Tile {
@@ -53,9 +62,23 @@ struct Tile {
     BiomeType biome;
 };
 
+float SmoothStep(float edge0,
+                 float edge1,
+                 float x)
+{
+    x = std::clamp(
+        (x - edge0) / (edge1 - edge0),
+        0.f,
+        1.f);
+
+    return x * x * (3.f - 2.f * x);
+}
+
 struct Tree
 {
     sf::Vector2f position;
+    sf::Color color;
+    float radius;
 };
 
 struct Chunk
@@ -64,6 +87,7 @@ struct Chunk
 
     std::vector<Tree> trees;
     bool treesGenerated = false;
+    sf::VertexArray terrain{sf::PrimitiveType::Triangles};
 };
 
 struct ChunkCoord
@@ -88,6 +112,374 @@ int floorDiv(int value, int divisor)
 int floorTile(float worldPosition)
 {
     return static_cast<int>(std::floor(worldPosition / static_cast<float>(Tile_Size)));
+}
+
+sf::Color landBiomeColor(BiomeType biome)
+{
+    switch (biome)
+    {
+        case BiomeType::Desert:
+            return DesertColor;
+        case BiomeType::Beach:
+            return BeachColor;
+        case BiomeType::Forest:
+            return ForestColor;
+        case BiomeType::Tundra:
+            return TundraColor;
+        case BiomeType::Swamp:
+            return SwampColor;
+        case BiomeType::Grassland:
+        default:
+            return GrassColor;
+    }
+}
+
+bool isLandBiome(BiomeType biome)
+{
+    return biome != BiomeType::WaterBody && biome != BiomeType::Mountain;
+}
+
+sf::Color terrainColorForTile(const Chunk& chunk, int localX, int localY)
+{
+    const Tile& tile = chunk.tiles[localY][localX];
+
+    if (tile.biome == BiomeType::WaterBody || tile.height < 0.30f)
+    {
+        return WaterColor;
+    }
+
+    if (tile.biome == BiomeType::Mountain || tile.height > 0.75f)
+    {
+        return tile.height > 0.82f ? SnowColor : MountainColor;
+    }
+
+    sf::Color color = landBiomeColor(tile.biome);
+    int red = 0;
+    int green = 0;
+    int blue = 0;
+    int differentLandNeighbors = 0;
+
+    for (int offsetY = -1; offsetY <= 1; ++offsetY)
+    {
+        for (int offsetX = -1; offsetX <= 1; ++offsetX)
+        {
+            if (offsetX == 0 && offsetY == 0)
+            {
+                continue;
+            }
+
+            int sampleX = localX + offsetX;
+            int sampleY = localY + offsetY;
+
+            if (sampleX < 0 ||
+                sampleX >= Chunk_Size ||
+                sampleY < 0 ||
+                sampleY >= Chunk_Size)
+            {
+                continue;
+            }
+
+            const Tile& neighbor = chunk.tiles[sampleY][sampleX];
+
+            if (neighbor.biome == tile.biome || !isLandBiome(neighbor.biome))
+            {
+                continue;
+            }
+
+            sf::Color neighborColor = landBiomeColor(neighbor.biome);
+            red += neighborColor.r;
+            green += neighborColor.g;
+            blue += neighborColor.b;
+            ++differentLandNeighbors;
+        }
+    }
+
+    if (differentLandNeighbors == 0)
+    {
+        return color;
+    }
+
+    sf::Color neighborTint(
+        red / differentLandNeighbors,
+        green / differentLandNeighbors,
+        blue / differentLandNeighbors);
+
+    float edgeAmount =
+        SmoothStep(0.f, 0.25f, differentLandNeighbors / 8.f) * 0.16f;
+
+    return lerpColor(color, neighborTint, edgeAmount);
+}
+
+void cacheChunkTerrainColors(Chunk& chunk)
+{
+    for (int localY = 0; localY < Chunk_Size; ++localY)
+    {
+        for (int localX = 0; localX < Chunk_Size; ++localX)
+        {
+            chunk.tiles[localY][localX].color =
+                terrainColorForTile(chunk, localX, localY);
+        }
+    }
+}
+
+void rebuildChunkTerrainMesh(Chunk& chunk, int chunkX, int chunkY)
+{
+    chunk.terrain.resize(Chunk_Size * Chunk_Size * 6);
+
+    int vertexIndex = 0;
+
+    for (int localY = 0; localY < Chunk_Size; ++localY)
+    {
+        for (int localX = 0; localX < Chunk_Size; ++localX)
+        {
+            float left =
+                static_cast<float>((chunkX * Chunk_Size + localX) * Tile_Size);
+            float top =
+                static_cast<float>((chunkY * Chunk_Size + localY) * Tile_Size);
+            float right = left + static_cast<float>(Tile_Size);
+            float bottom = top + static_cast<float>(Tile_Size);
+            sf::Color color = chunk.tiles[localY][localX].color;
+
+            chunk.terrain[vertexIndex + 0].position = {left, top};
+            chunk.terrain[vertexIndex + 1].position = {right, top};
+            chunk.terrain[vertexIndex + 2].position = {right, bottom};
+            chunk.terrain[vertexIndex + 3].position = {left, top};
+            chunk.terrain[vertexIndex + 4].position = {right, bottom};
+            chunk.terrain[vertexIndex + 5].position = {left, bottom};
+
+            for (int i = 0; i < 6; ++i)
+            {
+                chunk.terrain[vertexIndex + i].color = color;
+            }
+
+            vertexIndex += 6;
+        }
+    }
+}
+
+float hashFloat(int x, int y, uint32_t salt)
+{
+    uint32_t hash =
+        static_cast<uint32_t>(x) * 374761393u ^
+        static_cast<uint32_t>(y) * 668265263u ^
+        salt * 2246822519u;
+
+    hash = (hash ^ (hash >> 13u)) * 1274126177u;
+    hash ^= hash >> 16u;
+
+    return static_cast<float>(hash & 0x00FFFFFFu) /
+           static_cast<float>(0x01000000u);
+}
+
+struct TreeSpawnSettings
+{
+    float spawnRate;
+    float minHeight;
+    float maxHeight;
+    float minRadius;
+    float maxRadius;
+    sf::Color color;
+};
+
+TreeSpawnSettings treeSpawnSettings(BiomeType biome)
+{
+    switch (biome)
+    {
+        case BiomeType::Forest:
+            return {0.86f, 0.34f, 0.72f, 8.f, 13.f, sf::Color(35, 120, 45)};
+        case BiomeType::Swamp:
+            return {0.58f, 0.32f, 0.70f, 8.f, 12.f, sf::Color(45, 95, 45)};
+        case BiomeType::Grassland:
+            return {0.20f, 0.32f, 0.72f, 6.f, 9.f, sf::Color(75, 145, 65)};
+        case BiomeType::Tundra:
+            return {0.07f, 0.32f, 0.68f, 5.f, 8.f, sf::Color(120, 155, 135)};
+        case BiomeType::Desert:
+            return {0.025f, 0.32f, 0.68f, 4.f, 6.f, sf::Color(145, 135, 80)};
+        default:
+            return {0.f, 0.f, 0.f, 0.f, 0.f, sf::Color::Transparent};
+    }
+}
+
+float smallWaterThreshold(BiomeType biome)
+{
+    switch (biome)
+    {
+        case BiomeType::Swamp:
+            return 0.68f;
+        case BiomeType::Forest:
+            return 0.78f;
+        case BiomeType::Grassland:
+            return 0.84f;
+        case BiomeType::Tundra:
+            return 0.90f;
+        case BiomeType::Desert:
+            return 0.96f;
+        default:
+            return 1.1f;
+    }
+}
+
+bool hasAdjacentWater(const Chunk& chunk, int localX, int localY)
+{
+    for (int offsetY = -1; offsetY <= 1; ++offsetY)
+    {
+        for (int offsetX = -1; offsetX <= 1; ++offsetX)
+        {
+            if (offsetX == 0 && offsetY == 0)
+            {
+                continue;
+            }
+
+            int sampleX = localX + offsetX;
+            int sampleY = localY + offsetY;
+
+            if (sampleX < 0 ||
+                sampleX >= Chunk_Size ||
+                sampleY < 0 ||
+                sampleY >= Chunk_Size)
+            {
+                continue;
+            }
+
+            if (chunk.tiles[sampleY][sampleX].biome == BiomeType::WaterBody)
+            {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+void addBeachBiomes(Chunk& chunk)
+{
+    for (int localY = 0; localY < Chunk_Size; ++localY)
+    {
+        for (int localX = 0; localX < Chunk_Size; ++localX)
+        {
+            Tile& tile = chunk.tiles[localY][localX];
+
+            if (tile.biome == BiomeType::WaterBody ||
+                tile.biome == BiomeType::Mountain ||
+                tile.biome == BiomeType::Swamp)
+            {
+                continue;
+            }
+
+            if ((tile.height >= 0.30f && tile.height < 0.34f) ||
+                (tile.height < 0.72f && hasAdjacentWater(chunk, localX, localY)))
+            {
+                tile.biome = BiomeType::Beach;
+            }
+        }
+    }
+}
+
+void generateTreesForChunk(Chunk& chunk,
+                           int chunkX,
+                           int chunkY,
+                           FastNoiseLite& treeGenerator)
+{
+    chunk.trees.clear();
+
+    int chunkStartX = chunkX * Chunk_Size;
+    int chunkStartY = chunkY * Chunk_Size;
+    int chunkEndX = chunkStartX + Chunk_Size - 1;
+    int chunkEndY = chunkStartY + Chunk_Size - 1;
+
+    int startCellX = floorDiv(chunkStartX, Tree_Cell);
+    int endCellX = floorDiv(chunkEndX, Tree_Cell);
+    int startCellY = floorDiv(chunkStartY, Tree_Cell);
+    int endCellY = floorDiv(chunkEndY, Tree_Cell);
+
+    for (int cellY = startCellY; cellY <= endCellY; ++cellY)
+    {
+        for (int cellX = startCellX; cellX <= endCellX; ++cellX)
+        {
+            int worldTileX = cellX * Tree_Cell + Tree_Cell / 2;
+            int worldTileY = cellY * Tree_Cell + Tree_Cell / 2;
+
+            if (worldTileX < chunkStartX ||
+                worldTileX > chunkEndX ||
+                worldTileY < chunkStartY ||
+                worldTileY > chunkEndY)
+            {
+                continue;
+            }
+
+            int localX = worldTileX - chunkStartX;
+            int localY = worldTileY - chunkStartY;
+            const Tile& tile = chunk.tiles[localY][localX];
+            TreeSpawnSettings settings = treeSpawnSettings(tile.biome);
+
+            if (settings.spawnRate <= 0.f ||
+                tile.height < settings.minHeight ||
+                tile.height > settings.maxHeight)
+            {
+                continue;
+            }
+
+            float broadDensity =
+                (treeGenerator.GetNoise(worldTileX * 0.015f,
+                                        worldTileY * 0.015f) +
+                 1.f) *
+                0.5f;
+
+            float localDensity =
+                (treeGenerator.GetNoise(worldTileX * 0.18f,
+                                        worldTileY * 0.18f) +
+                 1.f) *
+                0.5f;
+
+            float spawnChance =
+                settings.spawnRate * (0.50f + broadDensity * 0.50f);
+
+            spawnChance *= (0.75f + localDensity * 0.25f);
+
+            if (hashFloat(cellX, cellY, 17u) > spawnChance)
+            {
+                continue;
+            }
+
+            float jitter = static_cast<float>(Tree_Cell * Tile_Size) * 0.34f;
+            float offsetX = (hashFloat(cellX, cellY, 29u) - 0.5f) * jitter;
+            float offsetY = (hashFloat(cellX, cellY, 31u) - 0.5f) * jitter;
+            float radiusMix = hashFloat(cellX, cellY, 43u);
+            int shade =
+                static_cast<int>((hashFloat(cellX, cellY, 47u) - 0.5f) * 28.f);
+
+            Tree tree;
+            tree.position = {
+                (static_cast<float>(worldTileX) + 0.5f) *
+                        static_cast<float>(Tile_Size) +
+                    offsetX,
+                (static_cast<float>(worldTileY) + 0.5f) *
+                        static_cast<float>(Tile_Size) +
+                    offsetY};
+
+            tree.radius =
+                settings.minRadius +
+                (settings.maxRadius - settings.minRadius) * radiusMix;
+
+            tree.color = sf::Color(
+                static_cast<uint8_t>(
+                    std::clamp(static_cast<int>(settings.color.r) + shade,
+                               0,
+                               255)),
+                static_cast<uint8_t>(
+                    std::clamp(static_cast<int>(settings.color.g) + shade,
+                               0,
+                               255)),
+                static_cast<uint8_t>(
+                    std::clamp(static_cast<int>(settings.color.b) + shade,
+                               0,
+                               255)));
+
+            chunk.trees.push_back(tree);
+        }
+    }
+
+    chunk.treesGenerated = true;
 }
 
 
@@ -205,9 +597,50 @@ Chunk generateChunk(int chunkX, int chunkY, FastNoiseLite& noise, FastNoiseLite&
                         tile.biome = BiomeType::Grassland;
                 }
             }
+
+            if (isLandBiome(tile.biome) &&
+                tile.height > 0.36f &&
+                tile.height < 0.70f)
+            {
+                float pondShape =
+                    (biomeNoise.GetNoise(
+                         worldTileX * 0.11f + 2000.f,
+                         worldTileY * 0.11f - 2000.f) +
+                     1.f) *
+                    0.5f;
+
+                float pondDetail =
+                    (biomeNoise.GetNoise(
+                         worldTileX * 0.32f - 700.f,
+                         worldTileY * 0.32f + 700.f) +
+                     1.f) *
+                    0.5f;
+
+                float threshold = smallWaterThreshold(tile.biome);
+
+                if (tile.moisture > 0.75f)
+                {
+                    threshold -= 0.04f;
+                }
+                else if (tile.moisture < 0.25f)
+                {
+                    threshold += 0.03f;
+                }
+
+                if (pondShape > threshold && pondDetail > 0.40f)
+                {
+                    tile.biome = BiomeType::WaterBody;
+                }
+            }
+
             chunk.tiles[localY][localX] = tile;
         }
     }
+
+    addBeachBiomes(chunk);
+    cacheChunkTerrainColors(chunk);
+    rebuildChunkTerrainMesh(chunk, chunkX, chunkY);
+    generateTreesForChunk(chunk, chunkX, chunkY, treeGenerator);
 
     return chunk;
 }
@@ -243,32 +676,12 @@ void unloadFarChunks(std::map<std::pair<int, int>, Chunk>& chunks, int centerChu
     }
 }
 
-void SpawnTree(sf::RenderWindow& window,sf::Vector2f position)
+void SpawnTree(sf::RenderWindow& window, sf::CircleShape& treeShape, const Tree& tree)
 {
-    sf::Color treeColor(54, 139, 70);
-    sf::Vector2f center(position);
-    float radius = 10.f;
-
-    sf::VertexArray tree(sf::PrimitiveType::TriangleFan , 8);
-
-    tree[0].position = center;
-    tree[0].color = treeColor;
-
-    for (size_t i = 0; i < 7; ++i)
-    {
-        // Convert index to radians (60 degrees per step)
-        float angle = i * 2 * M_PI / 6;
-
-        // Calculate X and Y coordinates relative to the center
-        float x = center.x + radius * std::cos(angle);
-        float y = center.y + radius * std::sin(angle);
-
-        tree[i + 1].position = sf::Vector2f(x, y);
-        tree[i + 1].color = treeColor;
-    }
-
-
-    window.draw(tree);
+    treeShape.setPosition(tree.position);
+    treeShape.setScale({tree.radius, tree.radius});
+    treeShape.setFillColor(tree.color);
+    window.draw(treeShape);
 }
 
 int main()
@@ -276,7 +689,8 @@ int main()
     sf::RenderWindow window(sf::VideoMode({800, 600}), "AI Simulation");
     window.setFramerateLimit(60);
 
-    sf::RectangleShape tileShape(sf::Vector2f(Tile_Size, Tile_Size));
+    sf::CircleShape treeShape(1.f, 7);
+    treeShape.setOrigin({1.f, 1.f});
 
     Player player;
     player.shape.setPosition({200, 150});
@@ -304,12 +718,6 @@ int main()
     temperatureNoise.SetSeed(456);
 
     std::map<std::pair<int, int>, Chunk> chunks;
-
-    sf::Color desert(220, 210, 120);
-    sf::Color grass(110, 190, 70);
-    sf::Color forest(40, 100, 50);
-    sf::Color swamp(60, 90, 50);
-    sf::Color tundra(190, 220, 220);
 
     while (window.isOpen())
     {
@@ -366,175 +774,34 @@ int main()
         {
             for (int chunkX = startChunkX; chunkX <= endChunkX; ++chunkX)
             {
-                Chunk &chunk = getChunk(chunks, chunkX, chunkY, noise, moistureNoise, temperatureNoise, continentNoise, treeGenerator,biomeNoise);
+                Chunk& chunk = getChunk(chunks,
+                                        chunkX,
+                                        chunkY,
+                                        noise,
+                                        moistureNoise,
+                                        temperatureNoise,
+                                        continentNoise,
+                                        treeGenerator,
+                                        biomeNoise);
 
-                if (!chunk.treesGenerated)
+                window.draw(chunk.terrain);
+            }
+        }
+
+        for (int chunkY = startChunkY; chunkY <= endChunkY; ++chunkY)
+        {
+            for (int chunkX = startChunkX; chunkX <= endChunkX; ++chunkX)
+            {
+                auto it = chunks.find(std::make_pair(chunkX, chunkY));
+
+                if (it == chunks.end())
                 {
-                    for (int y = 0; y < Chunk_Size; ++y)
-                    {
-                        for (int x = 0; x < Chunk_Size; ++x)
-                        {
-                            int worldX = chunkX * Chunk_Size + x;
-                            int worldY = chunkY * Chunk_Size + y;
-
-                            float height = chunk.tiles[y][x].height;
-                            int cellX = floorDiv(worldX, Tree_Cell);
-                            int cellY = floorDiv(worldY, Tree_Cell);
-
-                            int seed =
-                                cellX * 92837111 ^
-                                cellY * 689287499;
-
-                            float offsetX =
-                                ((seed & 255) / 255.f - 0.5f) * TreeSpacing;
-
-                            float offsetY =
-                                (((seed >> 8) & 255) / 255.f - 0.5f) * TreeSpacing;
-
-                            if (chunk.tiles[y][x].biome ==
-
-                                BiomeType::Forest && height > 0.4f && height < 0.7f)
-                            {
-                                if(worldX%Tree_Cell == 0 && worldY % Tree_Cell == 0){
-                                    float forestDensity =
-
-                                        (treeGenerator.GetNoise(
-
-                                            (chunkX * Chunk_Size + x) * 0.01f,
-
-                                             (chunkY * Chunk_Size + y) * 0.01f) +
-                                         1.f) *
-                                        0.5f;
-
-                                    float localVariation =
-
-                                        (treeGenerator.GetNoise(
-
-                                             (chunkX * Chunk_Size + x) * 0.3f,
-
-                                             (chunkY * Chunk_Size + y) * 0.3f) +
-                                         1.f) *
-                                        0.5f;
-                                    if ((forestDensity > 0.1f) && (localVariation > 0.3f))
-                                    {
-                                        Tree tree;
-
-                                        tree.position = {
-                                            float((chunkX * Chunk_Size + x) * Tile_Size)+ offsetX,
-                                            float((chunkY * Chunk_Size + y) * Tile_Size)+ offsetY};
-
-                                        bool canPlace = true;
-
-                                        for (const Tree &other : chunk.trees)
-                                        {
-                                            float dx = tree.position.x - other.position.x;
-                                            float dy = tree.position.y - other.position.y;
-
-                                            if (dx * dx + dy * dy < TreeSpacing * TreeSpacing)
-                                            {
-                                                canPlace = false;
-                                                break;
-                                            }
-                                        }
-
-                                        if (canPlace)
-                                        {
-                                            chunk.trees.push_back(tree);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    chunk.treesGenerated = true;
+                    continue;
                 }
 
-                for (int localY = 0; localY < Chunk_Size; ++localY)
+                for (const Tree& tree : it->second.trees)
                 {
-                    for (int localX = 0; localX < Chunk_Size; ++localX)
-                    {
-                        int tileX = chunkX * Chunk_Size + localX;
-                        int tileY = chunkY * Chunk_Size + localY;
-
-                        if (tileX < startTileX ||
-                            tileX >= endTileX ||
-                            tileY < startTileY ||
-                            tileY >= endTileY)
-                        {
-                            continue;
-                        }
-
-                        tileShape.setPosition({float(tileX * Tile_Size),
-                                               float(tileY * Tile_Size)});
-
-                        float height = chunk.tiles[localY][localX].height;
-
-                        BiomeType biome = chunk.tiles[localY][localX].biome;
-
-                        Tile &tile = chunk.tiles[localY][localX];
-
-                        float t = tile.temperature;
-                        float m = tile.moisture;
-                        float h = tile.height;
-
-                        sf::Color color;
-
-                        if (h < 0.30f)
-                        {
-                            color = sf::Color(30, 100, 220); // water
-                        }
-                        else if (h > 0.75f)
-                        {
-                            if (h > 0.85f)
-                                color = sf::Color::White;
-                            else
-                                color = sf::Color(120, 120, 120);
-                        }
-                        else
-                        {
-                            sf::Color cold(190, 220, 220);   // tundra
-                            sf::Color grass(110, 190, 70);   // grassland
-                            sf::Color forest(40, 100, 50);   // forest
-                            sf::Color swamp(60, 90, 50);     // swamp
-                            sf::Color desert(220, 210, 120); // desert
-
-                            if (t < 0.3f)
-                            {
-                                color = LerpColor(cold, grass, t / 0.3f);
-                            }
-                            else if (t > 0.7f)
-                            {
-                                color = LerpColor(grass, desert,
-                                                  (t - 0.7f) / 0.3f);
-                            }
-                            else
-                            {
-                                if (m > 0.7f)
-                                {
-                                    color = LerpColor(forest,
-                                                      swamp,
-                                                      (m - 0.7f) / 0.3f);
-                                }
-                                else
-                                {
-                                    color = LerpColor(grass,
-                                                      forest,
-                                                      m / 0.7f);
-                                }
-                            }
-                        }
-
-                        tileShape.setFillColor(color);
-
-                        window.draw(tileShape);
-                    }
-                }
-
-                bool canPlace = true;
-                for (const Tree &tree : chunk.trees)
-                {
-                    SpawnTree(window, tree.position);
+                    SpawnTree(window, treeShape, tree);
                 }
             }
         }
