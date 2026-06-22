@@ -4,6 +4,7 @@
 #include <map>
 #include <cmath>
 #include <cstdint>
+#include <climits>
 
 constexpr int Chunk_Size = 32;
 constexpr int Tile_Size = 8;
@@ -11,6 +12,18 @@ constexpr int Chunk_Unload_Radius = 8;
 constexpr float Camera_Zoom = 3.f;
 constexpr int Tree_Cell = 6;
 constexpr float TreeSpacing = 32.f;
+
+sf::Color LerpColor(const sf::Color &a,
+                    const sf::Color &b,
+                    float t)
+{
+    t = std::clamp(t, 0.f, 1.f);
+
+    return sf::Color(
+        static_cast<uint8_t>(a.r + (b.r - a.r) * t),
+        static_cast<uint8_t>(a.g + (b.g - a.g) * t),
+        static_cast<uint8_t>(a.b + (b.b - a.b) * t));
+}
 
 struct Player {
     sf::CircleShape shape;
@@ -36,6 +49,7 @@ struct Tile {
     float moisture;
     float temperature;
     float fertility;
+    sf::Color color;
     BiomeType biome;
 };
 
@@ -78,7 +92,7 @@ int floorTile(float worldPosition)
 
 
 
-Chunk generateChunk(int chunkX, int chunkY, FastNoiseLite& noise, FastNoiseLite& moistureNoise, FastNoiseLite& temperatureNoise, FastNoiseLite& continentNoise, FastNoiseLite& treeGenerator)
+Chunk generateChunk(int chunkX, int chunkY, FastNoiseLite& noise, FastNoiseLite& moistureNoise, FastNoiseLite& temperatureNoise, FastNoiseLite& continentNoise, FastNoiseLite& treeGenerator,FastNoiseLite& biomeNoise)
 {
     Chunk chunk;
 
@@ -101,6 +115,14 @@ Chunk generateChunk(int chunkX, int chunkY, FastNoiseLite& noise, FastNoiseLite&
             tile.height = (noise.GetNoise(
                 static_cast<float>(worldTileX) * 0.05f,
                 static_cast<float>(worldTileY) * 0.05f) *0.7f + continent * 0.3f + 1.f) * 0.5f;
+            float variation =
+                (biomeNoise.GetNoise(
+                     worldTileX * 0.05f,
+                     worldTileY * 0.05f) +
+                 1.f) *
+                0.5f;
+
+           
             tile.moisture =
                 (moistureNoise.GetNoise(
                      worldTileX * 0.03f,
@@ -108,28 +130,81 @@ Chunk generateChunk(int chunkX, int chunkY, FastNoiseLite& noise, FastNoiseLite&
                  1.f) *
                 0.5f;
 
-            tile.temperature =
+            float largeTemp =
+
                 (temperatureNoise.GetNoise(
+
                      worldTileX * 0.01f,
+
                      worldTileY * 0.01f) +
                  1.f) *
                 0.5f;
 
-            tile.fertility = 0.f;
-            if (tile.height < 0.3f)
-                tile.biome = BiomeType::WaterBody;
-            else if (tile.height > 0.7f)
-                tile.biome = BiomeType::Mountain;
-            else if (tile.temperature > 0.7f &&
-                     tile.moisture < 0.3f)
-                tile.biome = BiomeType::Desert;
-            else if (tile.temperature < 0.3f)
-                tile.biome = BiomeType::Tundra;
-            else if (tile.moisture > 0.7f)
-                tile.biome = BiomeType::Swamp;
-            else
-                tile.biome = BiomeType::Forest;
+            float smallTemp =
 
+                (temperatureNoise.GetNoise(
+
+                     worldTileX * 0.03f,
+
+                     worldTileY * 0.03f) +
+                 1.f) *
+                0.5f;
+
+            tile.temperature =
+
+                tile.temperature =
+
+                    largeTemp * 0.7f +
+
+                    smallTemp * 0.2f + continent * 0.1f;
+
+            tile.moisture += (variation - 0.5f) * 0.2f;
+            tile.temperature += (variation - 0.5f) * 0.2f;
+
+            tile.moisture = std::clamp(tile.moisture, 0.f, 1.f);
+
+            tile.temperature = std::clamp(tile.temperature, 0.f, 1.f);
+
+            tile.fertility = 0.f;
+            if (tile.height < 0.30f)
+            {
+                tile.biome = BiomeType::WaterBody;
+            }
+            else if (tile.height > 0.75f)
+            {
+                tile.biome = BiomeType::Mountain;
+            }
+            else
+            {
+                float t = tile.temperature;
+                float m = tile.moisture;
+
+                if (t < 0.3f)
+                {
+                    if (m > 0.65f)
+                        tile.biome = BiomeType::Swamp;
+                    else
+                        tile.biome = BiomeType::Tundra;
+                }
+                else if (t > 0.7f)
+                {
+                    if (m < 0.3f)
+                        tile.biome = BiomeType::Desert;
+                    else if (m > 0.7f)
+                        tile.biome = BiomeType::Forest;
+                    else
+                        tile.biome = BiomeType::Grassland;
+                }
+                else
+                {
+                    if (m > 0.7f)
+                        tile.biome = BiomeType::Swamp;
+                    else if (m > 0.5f)
+                        tile.biome = BiomeType::Forest;
+                    else
+                        tile.biome = BiomeType::Grassland;
+                }
+            }
             chunk.tiles[localY][localX] = tile;
         }
     }
@@ -137,14 +212,14 @@ Chunk generateChunk(int chunkX, int chunkY, FastNoiseLite& noise, FastNoiseLite&
     return chunk;
 }
 
-Chunk& getChunk(std::map<std::pair<int, int>, Chunk>& chunks, int chunkX, int chunkY, FastNoiseLite& noise, FastNoiseLite& moistureNoise, FastNoiseLite& temperatureNoise, FastNoiseLite& continentNoise, FastNoiseLite& treeGenerator)
+Chunk& getChunk(std::map<std::pair<int, int>, Chunk>& chunks, int chunkX, int chunkY, FastNoiseLite& noise, FastNoiseLite& moistureNoise, FastNoiseLite& temperatureNoise, FastNoiseLite& continentNoise, FastNoiseLite& treeGenerator,FastNoiseLite& biomeNoise)
 {
     auto key = std::make_pair(chunkX, chunkY);
     auto it = chunks.find(key);
 
     if (it == chunks.end())
     {
-        it = chunks.emplace(key, generateChunk(chunkX, chunkY, noise, moistureNoise, temperatureNoise, continentNoise, treeGenerator)).first;
+        it = chunks.emplace(key, generateChunk(chunkX, chunkY, noise, moistureNoise, temperatureNoise, continentNoise, treeGenerator, biomeNoise)).first;
     }
 
     return it->second;
@@ -219,7 +294,9 @@ int main()
     FastNoiseLite temperatureNoise;
     FastNoiseLite continentNoise;
     FastNoiseLite treeGenerator;
-    
+    FastNoiseLite biomeNoise;
+
+    biomeNoise.SetSeed(777);
     noise.SetSeed(42);
     treeGenerator.SetSeed(789);
     continentNoise.SetSeed(999);
@@ -228,6 +305,11 @@ int main()
 
     std::map<std::pair<int, int>, Chunk> chunks;
 
+    sf::Color desert(220, 210, 120);
+    sf::Color grass(110, 190, 70);
+    sf::Color forest(40, 100, 50);
+    sf::Color swamp(60, 90, 50);
+    sf::Color tundra(190, 220, 220);
 
     while (window.isOpen())
     {
@@ -284,7 +366,7 @@ int main()
         {
             for (int chunkX = startChunkX; chunkX <= endChunkX; ++chunkX)
             {
-                Chunk &chunk = getChunk(chunks, chunkX, chunkY, noise, moistureNoise, temperatureNoise, continentNoise, treeGenerator);
+                Chunk &chunk = getChunk(chunks, chunkX, chunkY, noise, moistureNoise, temperatureNoise, continentNoise, treeGenerator,biomeNoise);
 
                 if (!chunk.treesGenerated)
                 {
@@ -318,9 +400,9 @@ int main()
 
                                         (treeGenerator.GetNoise(
 
-                                            (chunkX * Chunk_Size + x) * 0.03f,
+                                            (chunkX * Chunk_Size + x) * 0.01f,
 
-                                             (chunkY * Chunk_Size + y) * 0.03f) +
+                                             (chunkY * Chunk_Size + y) * 0.01f) +
                                          1.f) *
                                         0.5f;
 
@@ -333,7 +415,7 @@ int main()
                                              (chunkY * Chunk_Size + y) * 0.3f) +
                                          1.f) *
                                         0.5f;
-                                    if ((forestDensity > 0.3f) && (localVariation > 0.5f))
+                                    if ((forestDensity > 0.1f) && (localVariation > 0.3f))
                                     {
                                         Tree tree;
 
@@ -388,14 +470,62 @@ int main()
 
                         float height = chunk.tiles[localY][localX].height;
 
-                        if (height < 0.3f)
-                            tileShape.setFillColor(sf::Color::Blue);
-                        else if (height < 0.4f)
-                            tileShape.setFillColor(sf::Color::Yellow);
-                        else if (height < 0.7f)
-                            tileShape.setFillColor(sf::Color::Green);
+                        BiomeType biome = chunk.tiles[localY][localX].biome;
+
+                        Tile &tile = chunk.tiles[localY][localX];
+
+                        float t = tile.temperature;
+                        float m = tile.moisture;
+                        float h = tile.height;
+
+                        sf::Color color;
+
+                        if (h < 0.30f)
+                        {
+                            color = sf::Color(30, 100, 220); // water
+                        }
+                        else if (h > 0.75f)
+                        {
+                            if (h > 0.85f)
+                                color = sf::Color::White;
+                            else
+                                color = sf::Color(120, 120, 120);
+                        }
                         else
-                            tileShape.setFillColor(sf::Color(120, 120, 120));
+                        {
+                            sf::Color cold(190, 220, 220);   // tundra
+                            sf::Color grass(110, 190, 70);   // grassland
+                            sf::Color forest(40, 100, 50);   // forest
+                            sf::Color swamp(60, 90, 50);     // swamp
+                            sf::Color desert(220, 210, 120); // desert
+
+                            if (t < 0.3f)
+                            {
+                                color = LerpColor(cold, grass, t / 0.3f);
+                            }
+                            else if (t > 0.7f)
+                            {
+                                color = LerpColor(grass, desert,
+                                                  (t - 0.7f) / 0.3f);
+                            }
+                            else
+                            {
+                                if (m > 0.7f)
+                                {
+                                    color = LerpColor(forest,
+                                                      swamp,
+                                                      (m - 0.7f) / 0.3f);
+                                }
+                                else
+                                {
+                                    color = LerpColor(grass,
+                                                      forest,
+                                                      m / 0.7f);
+                                }
+                            }
+                        }
+
+                        tileShape.setFillColor(color);
 
                         window.draw(tileShape);
                     }
