@@ -867,7 +867,7 @@ int main()
         }
 
         window.draw(player.shape);
-        window.draw(darkness);
+       // window.draw(darkness);
         window.draw(text);
         window.display();
     }
