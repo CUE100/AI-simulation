@@ -722,6 +722,9 @@ int main()
     sf::Clock clock;
     float fps = 0.0f;
 
+    float timeOfDay = 0.f;
+
+
     Player player;
     player.shape.setPosition({200, 150});
     sf::View cam(sf::FloatRect({
@@ -749,7 +752,7 @@ int main()
 
     std::map<std::pair<int, int>, Chunk> chunks;
 
- 
+    sf::RectangleShape darkness(cam.getSize());
 
     while (window.isOpen())
     {
@@ -758,6 +761,19 @@ int main()
         fps = 1.0f / deltaTime;
 
         text.setString("FPS: " + std::to_string(static_cast<int>(fps)));
+
+        timeOfDay += deltaTime * 0.02f;
+
+        float light =
+            (std::sin(timeOfDay) + 1.f) * 0.5f;
+
+        darkness.setPosition(
+
+            cam.getCenter() - cam.getSize() / 2.f);
+
+        darkness.setFillColor(
+
+            sf::Color(0, 0, 40, 180 * (1.f - light)));
 
         while (std::optional event = window.pollEvent())
         {
@@ -851,6 +867,7 @@ int main()
         }
 
         window.draw(player.shape);
+        window.draw(darkness);
         window.draw(text);
         window.display();
     }
