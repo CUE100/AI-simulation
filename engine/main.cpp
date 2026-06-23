@@ -6,9 +6,10 @@
 #include <cstdint>
 #include <climits>
 #include <algorithm>
+#include <iostream>
 
 constexpr int Chunk_Size = 32;
-constexpr int Tile_Size = 8;
+constexpr int Tile_Size = 12;
 constexpr int Chunk_Unload_Radius = 8;
 constexpr float Camera_Zoom = 3.f;
 constexpr int Tree_Cell = 6;
@@ -86,8 +87,11 @@ struct Chunk
     Tile tiles[Chunk_Size][Chunk_Size];
 
     std::vector<Tree> trees;
-    bool treesGenerated = false;
+
     sf::VertexArray terrain{sf::PrimitiveType::Triangles};
+    sf::VertexArray treeMesh{sf::PrimitiveType::Triangles};
+
+    bool treesGenerated = false;
 };
 
 struct ChunkCoord
@@ -482,7 +486,35 @@ void generateTreesForChunk(Chunk& chunk,
     chunk.treesGenerated = true;
 }
 
+void buildTreeMesh(Chunk &chunk)
+{
+    chunk.treeMesh.clear();
 
+    for (const Tree &tree : chunk.trees)
+    {
+        float r = tree.radius;
+
+        float left = tree.position.x - r;
+        float right = tree.position.x + r;
+        float top = tree.position.y - r;
+        float bottom = tree.position.y + r;
+        sf::Vertex vertices[] = {
+            // First Triangle
+            {{left, top}, tree.color, {0.0f, 0.0f}},
+            {{right, top}, tree.color, {0.0f, 0.0f}},
+            {{right, bottom}, tree.color, {0.0f, 0.0f}},
+
+            // Second Triangle
+            {{left, top}, tree.color, {0.0f, 0.0f}},
+            {{right, bottom}, tree.color, {0.0f, 0.0f}},
+            {{left, bottom}, tree.color, {0.0f, 0.0f}}};
+
+        for (const auto &vertex : vertices)
+        {
+            chunk.treeMesh.append(vertex);
+        }
+    }
+}
 
 Chunk generateChunk(int chunkX, int chunkY, FastNoiseLite& noise, FastNoiseLite& moistureNoise, FastNoiseLite& temperatureNoise, FastNoiseLite& continentNoise, FastNoiseLite& treeGenerator,FastNoiseLite& biomeNoise)
 {
@@ -602,19 +634,13 @@ Chunk generateChunk(int chunkX, int chunkY, FastNoiseLite& noise, FastNoiseLite&
                 tile.height > 0.36f &&
                 tile.height < 0.70f)
             {
-                float pondShape =
+                float pond =
                     (biomeNoise.GetNoise(
-                         worldTileX * 0.11f + 2000.f,
-                         worldTileY * 0.11f - 2000.f) +
+                         worldTileX * 0.12f + 2000.f,
+                         worldTileY * 0.12f - 2000.f) +
                      1.f) *
                     0.5f;
 
-                float pondDetail =
-                    (biomeNoise.GetNoise(
-                         worldTileX * 0.32f - 700.f,
-                         worldTileY * 0.32f + 700.f) +
-                     1.f) *
-                    0.5f;
 
                 float threshold = smallWaterThreshold(tile.biome);
 
@@ -627,7 +653,7 @@ Chunk generateChunk(int chunkX, int chunkY, FastNoiseLite& noise, FastNoiseLite&
                     threshold += 0.03f;
                 }
 
-                if (pondShape > threshold && pondDetail > 0.40f)
+                if (pond > threshold )
                 {
                     tile.biome = BiomeType::WaterBody;
                 }
@@ -641,6 +667,7 @@ Chunk generateChunk(int chunkX, int chunkY, FastNoiseLite& noise, FastNoiseLite&
     cacheChunkTerrainColors(chunk);
     rebuildChunkTerrainMesh(chunk, chunkX, chunkY);
     generateTreesForChunk(chunk, chunkX, chunkY, treeGenerator);
+    buildTreeMesh(chunk);
 
     return chunk;
 }
@@ -676,21 +703,11 @@ void unloadFarChunks(std::map<std::pair<int, int>, Chunk>& chunks, int centerChu
     }
 }
 
-void SpawnTree(sf::RenderWindow& window, sf::CircleShape& treeShape, const Tree& tree)
-{
-    treeShape.setPosition(tree.position);
-    treeShape.setScale({tree.radius, tree.radius});
-    treeShape.setFillColor(tree.color);
-    window.draw(treeShape);
-}
-
 int main()
 {
     sf::RenderWindow window(sf::VideoMode({800, 600}), "AI Simulation");
-    window.setFramerateLimit(60);
+    window.setFramerateLimit(144);
 
-    sf::CircleShape treeShape(1.f, 7);
-    treeShape.setOrigin({1.f, 1.f});
 
     Player player;
     player.shape.setPosition({200, 150});
@@ -718,6 +735,8 @@ int main()
     temperatureNoise.SetSeed(456);
 
     std::map<std::pair<int, int>, Chunk> chunks;
+
+ 
 
     while (window.isOpen())
     {
@@ -799,10 +818,17 @@ int main()
                     continue;
                 }
 
-                for (const Tree& tree : it->second.trees)
+                window.draw(it->second.treeMesh);
+                int totalTrees = 0;
+
+                for (auto &pair : chunks)
                 {
-                    SpawnTree(window, treeShape, tree);
+                    totalTrees += pair.second.trees.size();
                 }
+
+                std::cout << "Trees: "
+                          << totalTrees
+                          << "\n";
             }
         }
 
