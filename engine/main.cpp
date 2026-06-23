@@ -9,9 +9,9 @@
 #include <iostream>
 
 constexpr int Chunk_Size = 32;
-constexpr int Tile_Size = 12;
-constexpr int Chunk_Unload_Radius = 8;
-constexpr float Camera_Zoom = 3.f;
+constexpr int Tile_Size = 16;
+constexpr int Chunk_Unload_Radius = 16;
+constexpr float Camera_Zoom = 4.f;
 constexpr int Tree_Cell = 6;
 
 const sf::Color WaterColor(30, 100, 220);
@@ -706,8 +706,21 @@ void unloadFarChunks(std::map<std::pair<int, int>, Chunk>& chunks, int centerChu
 int main()
 {
     sf::RenderWindow window(sf::VideoMode({800, 600}), "AI Simulation");
-    window.setFramerateLimit(144);
+    window.setFramerateLimit(1000);
 
+    sf::Font font;
+    if (!font.openFromFile("/System/Library/Fonts/Supplemental/Arial Black.ttf"))
+    {
+        std::cerr << "Failed to load font\n";
+    }
+
+    sf::Text text(font);
+    text.setCharacterSize(64);
+    text.setPosition({100, 100});
+    text.setFillColor(sf::Color::White);
+
+    sf::Clock clock;
+    float fps = 0.0f;
 
     Player player;
     player.shape.setPosition({200, 150});
@@ -740,6 +753,12 @@ int main()
 
     while (window.isOpen())
     {
+
+        float deltaTime = clock.restart().asSeconds();
+        fps = 1.0f / deltaTime;
+
+        text.setString("FPS: " + std::to_string(static_cast<int>(fps)));
+
         while (std::optional event = window.pollEvent())
         {
             if (event->is<sf::Event::Closed>())
@@ -764,6 +783,7 @@ int main()
         auto pos = player.shape.getPosition();
 
         cam.setCenter(pos);
+        text.setPosition({pos.x - 400, pos.y - 300});
         window.setView(cam);
 
         int playerTileX = floorTile(pos.x);
@@ -826,13 +846,12 @@ int main()
                     totalTrees += pair.second.trees.size();
                 }
 
-                std::cout << "Trees: "
-                          << totalTrees
-                          << "\n";
+               // std::cout << "Trees: " << totalTrees << "\n";
             }
         }
 
         window.draw(player.shape);
+        window.draw(text);
         window.display();
     }
 
