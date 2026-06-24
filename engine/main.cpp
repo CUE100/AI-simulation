@@ -760,20 +760,38 @@ int main()
         float deltaTime = clock.restart().asSeconds();
         fps = 1.0f / deltaTime;
 
-        text.setString("FPS: " + std::to_string(static_cast<int>(fps)));
+        float dayPercent =
+            std::fmod(timeOfDay, 6.28318f) / (6.28318f);
 
-        timeOfDay += deltaTime * 0.02f;
+        int hour =
+            static_cast<int>(dayPercent * 24.f);
+
+        text.setString(
+            "FPS: " +
+            std::to_string(static_cast<int>(fps)) +
+            "\nHour: " +
+            std::to_string(hour));
+
+        timeOfDay += deltaTime * 0.05f;
 
         float light =
             (std::sin(timeOfDay) + 1.f) * 0.5f;
 
-        darkness.setPosition(
+        float brightness =
+            (std::sin(timeOfDay) + 1.f) * 0.5f;
 
-            cam.getCenter() - cam.getSize() / 2.f);
+        uint8_t alpha =
+            static_cast<uint8_t>(180.f * (1.f - brightness));
 
         darkness.setFillColor(
+            sf::Color(0, 0, 30, alpha));
 
-            sf::Color(0, 0, 40, 180 * (1.f - light)));
+        darkness.setSize(cam.getSize());
+
+        bool isNight = (hour >= 20 || hour < 6);
+        bool isMorning = (hour >= 6 && hour < 10);
+        bool isDay = (hour >= 10 && hour < 18);
+        bool isEvening = (hour >= 18 && hour < 20);
 
         while (std::optional event = window.pollEvent())
         {
@@ -791,10 +809,10 @@ int main()
             }
         }
 
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W)) player.shape.move({0, -1 * 40});
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S)) player.shape.move({0, 1 * 40});
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A)) player.shape.move({-1 * 40, 0});
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D)) player.shape.move({1 * 40, 0});
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W)) player.shape.move({0, -1 * 20});
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S)) player.shape.move({0, 1 * 20});
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A)) player.shape.move({-1 * 20, 0});
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D)) player.shape.move({1 * 20, 0});
 
         auto pos = player.shape.getPosition();
 
@@ -865,9 +883,12 @@ int main()
                // std::cout << "Trees: " << totalTrees << "\n";
             }
         }
+        darkness.setPosition(
+
+            cam.getCenter() - cam.getSize() / 2.f);
 
         window.draw(player.shape);
-       // window.draw(darkness);
+        window.draw(darkness);
         window.draw(text);
         window.display();
     }
